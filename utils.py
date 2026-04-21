@@ -12,51 +12,74 @@ def compute_maccs(smiles):
 from rdkit.Chem import Descriptors
 
 def compute_descriptors(smiles):
+    from rdkit import Chem
+    from rdkit.Chem import Descriptors, rdMolDescriptors
+
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
-        return np.zeros(len(Descriptors._descList))
-    
-    desc = []
-    for name, func in Descriptors._descList:
-        try:
-            desc.append(func(mol))
-        except:
-            desc.append(0)
-    
-    return np.array(desc)
+        raise ValueError("Invalid SMILES")
 
-from torch_geometric.data import Data
-import torch
+    descriptor_functions = [
+        Descriptors.MolWt,
+        Descriptors.MolLogP,
+        Descriptors.NumHDonors,
+        Descriptors.NumHAcceptors,
+        rdMolDescriptors.CalcTPSA,
+        Descriptors.NumRotatableBonds,
+        Descriptors.NumAromaticRings,
+        rdMolDescriptors.CalcNumAromaticCarbocycles,
+        rdMolDescriptors.CalcNumAromaticHeterocycles,
+        rdMolDescriptors.CalcNumSaturatedRings,
+        rdMolDescriptors.CalcNumHeteroatoms,
+        rdMolDescriptors.CalcNumRings,
+        rdMolDescriptors.CalcNumHeavyAtoms,
+    ]
+
+    return [fn(mol) for fn in descriptor_functions]
 
 def mol_to_graph(smiles):
+    from rdkit import Chem
+    import torch
+    from torch_geometric.data import Data
+
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return None
 
-    # Node features
-    node_features = []
-    for atom in mol.GetAtoms():
-        node_features.append([
+    # --- Node features (ORDER MUST MATCH TRAINING) ---
+    x = torch.stack([
+        torch.tensor([
             atom.GetAtomicNum(),
             atom.GetDegree(),
             atom.GetFormalCharge(),
-            atom.GetHybridization(),
-            atom.GetIsAromatic(),
+            int(atom.GetChiralTag()),
             atom.GetTotalNumHs(),
+            int(atom.GetHybridization()),
+            atom.GetIsAromatic(),
             atom.GetMass(),
-            atom.GetChiralTag()
-        ])
+        ], dtype=torch.float)
+        for atom in mol.GetAtoms()
+    ])
 
-    x = torch.tensor(node_features, dtype=torch.float)
-
-    # Edges
+    # --- Edge features ---
     edge_index = []
+    edge_attr = []
+
     for bond in mol.GetBonds():
-        i = bond.GetBeginAtomIdx()
-        j = bond.GetEndAtomIdx()
-        edge_index.append([i, j])
-        edge_index.append([j, i])
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+
+        edge_index += [[i, j], [j, i]]
+
+        feat = torch.tensor([
+            float(bond.GetBondTypeAsDouble()),
+            bond.IsInRing(),
+            int(bond.GetStereo()),
+            bond.GetIsConjugated(),
+        ], dtype=torch.float)
+
+        edge_attr += [feat, feat]
 
     edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
+    edge_attr = torch.stack(edge_attr)
 
-    return Data(x=x, edge_index=edge_index)
+    return Data(x=x, edge_index=edge_index, edge_attr=edge_attr)

@@ -110,8 +110,8 @@ div.stButton > button:focus {
 def load_models():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model_div = Multimodal(desc_dim=200, maccs_dim=167)
-    model_unc = Multimodal(desc_dim=200, maccs_dim=167)
+    model_div = Multimodal(desc_dim=13, maccs_dim=167)
+    model_unc = Multimodal(desc_dim=13, maccs_dim=167)
 
     model_div.load_state_dict(torch.load("al_diversity_last_round.pth", map_location=device))
     model_unc.load_state_dict(torch.load("al_uncertainty_last_round.pth", map_location=device))
@@ -146,10 +146,10 @@ with tab1:
                 tokens = tokenize_smiles(smiles)
 
                 # --- Tensor ---
-                desc = torch.tensor(desc).unsqueeze(0).to(device)
-                maccs = torch.tensor(maccs).unsqueeze(0).to(device)
-                tokens = torch.tensor(tokens).unsqueeze(0).to(device)
-                graph = graph.to(device)
+                desc = torch.tensor(desc, dtype=torch.float32).unsqueeze(0).to(device)
+                maccs = torch.tensor(maccs, dtype=torch.float32).unsqueeze(0).to(device)
+                tokens = torch.tensor(tokens, dtype=torch.long).unsqueeze(0).to(device)
+                graph = Batch.from_data_list([graph]).to(device)
 
                 # --- Predictions ---
                 prob_div = model_div.predict_proba(desc, maccs, graph)[0][1]
@@ -159,22 +159,22 @@ with tab1:
                 prob_ens = (prob_div + prob_unc) / 2
 
                 # --- Output ---
-                st.subheader("🔍 Model Predictions")
+                st.subheader("🔍 Models Predictions")
 
                 col1, col2 = st.columns(2)
 
                 with col1:
-                    st.metric("Diversity Model", f"{prob_div:.4f}")
+                    st.metric("Diversity Probability", f"{prob_div:.4f}")
 
                 with col2:
-                    st.metric("Uncertainty Model", f"{prob_unc:.4f}")
+                    st.metric("Uncertainty Probability", f"{prob_unc:.4f}")
 
                 st.subheader("Consensus Result")
 
                 prediction = "Active" if prob_ens > 0.5 else "Inactive"
 
-                st.success(f"Final Prediction: {prediction}")
-                st.write(f"Ensemble Probability: {prob_ens:.4f}")
+                st.success(f"Consensus Prediction: {prediction}")
+                st.write(f"Consensus Probability: {prob_ens:.4f}")
 
             except Exception as e:
                 st.error(f"Error: {e}")
@@ -187,30 +187,53 @@ with tab2:
         if "SMILES" not in df.columns:
             st.error("CSV must contain 'SMILES' column")
         else:
-            results = []
+            div_probs = []
+            unc_probs = []
+            ens_probs = []
 
             for smiles in df["SMILES"]:
                 try:
                     desc = compute_descriptors(smiles)
                     maccs = compute_maccs(smiles)
                     graph = mol_to_graph(smiles)
-                    tokens = tokenize_smiles(smiles)
 
-                    desc = torch.tensor(desc).unsqueeze(0).to(device)
-                    maccs = torch.tensor(maccs).unsqueeze(0).to(device)
-                    tokens = torch.tensor(tokens).unsqueeze(0).to(device)
+                    desc = torch.tensor(desc, dtype=torch.float32).unsqueeze(0).to(device)
+                    maccs = torch.tensor(maccs, dtype=torch.float32).unsqueeze(0).to(device)
                     graph = Batch.from_data_list([graph]).to(device)
 
                     prob_div = model_div.predict_proba(desc, maccs, graph)[0][1]
                     prob_unc = model_unc.predict_proba(desc, maccs, graph)[0][1]
                     prob_ens = (prob_div + prob_unc) / 2
 
-                    results.append(prob_ens)
+                    div_probs.append(prob_div)
+                    unc_probs.append(prob_unc)
+                    ens_probs.append(prob_ens)
 
                 except:
-                    results.append(None)
+                    div_probs.append(None)
+                    unc_probs.append(None)
+                    ens_probs.append(None)
 
-            df["Prediction"] = results
+            df["Diversity Probability"] = div_probs
+            df["Uncertainty Probability"] = unc_probs
+            df["Consensus Probability"] = ens_probs
 
             st.dataframe(df)
 
+# =========================
+# Footer
+# =========================
+# --- Spacer before author section ---
+st.markdown("<br><br><br>", unsafe_allow_html=True)
+
+# --- Author Section ---
+st.markdown("""
+<div class="author">
+Authors\n
+Tarapong Srisongkram<sup>1*</sup>, Darlene Nabila Zetta<sup>2</sup>, Sastiya Kampaengsri<sup>1</sup>
+
+<sup>1</sup>*Division of Pharmaceutical Chemistry, Faculty of Pharmaceutical Sciences, Khon Kaen University, Khon Kaen 40002, Thailand*
+            
+<sup>2</sup>*Graduate School in the Program of Pharmaceutical Sciences, Faculty of Pharmaceutical Sciences, Khon Kaen University, Khon Kaen 40002, Thailand*
+</div>
+""", unsafe_allow_html=True)
