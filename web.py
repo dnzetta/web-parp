@@ -230,10 +230,11 @@ st.markdown("<br><br><br>", unsafe_allow_html=True)
 st.markdown("""
 <div class="author">
 Authors\n
-Tarapong Srisongkram<sup>1*</sup>, Darlene Nabila Zetta<sup>2</sup>, Sastiya Kampaengsri<sup>1</sup>
+Andi Endang Kusuma Intan<sup>1</sup>, Darlene Nabila Zetta<sup>1</sup>, and Tarapong Srisongkram<sup>2*</sup>
 
-<sup>1</sup>*Division of Pharmaceutical Chemistry, Faculty of Pharmaceutical Sciences, Khon Kaen University, Khon Kaen 40002, Thailand*
+<sup>1</sup>*Graduate School in the Program of Pharmaceutical Sciences, Faculty of Pharmaceutical Sciences, Khon Kaen University, Khon Kaen 40002, Thailand*
             
-<sup>2</sup>*Graduate School in the Program of Pharmaceutical Sciences, Faculty of Pharmaceutical Sciences, Khon Kaen University, Khon Kaen 40002, Thailand*
-</div>
+<sup>2</sup>*Division of Pharmaceutical Chemistry, Faculty of Pharmaceutical Sciences, Khon Kaen University, Khon Kaen 40002, Thailand* </div>
+            
+
 """, unsafe_allow_html=True)
